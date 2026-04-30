@@ -2692,6 +2692,13 @@ yaml.add_representer(MgmtGatewaySpec, ServiceSpec.yaml_representer)
 
 
 class OAuth2ProxySpec(ServiceSpec):
+    REQUIRED_FIELDS = (
+        'provider_display_name',
+        'oidc_issuer_url',
+        'client_id',
+        'client_secret',
+    )
+
     def __init__(self,
                  service_type: str = 'oauth2-proxy',
                  service_id: Optional[str] = None,
@@ -2774,6 +2781,13 @@ class OAuth2ProxySpec(ServiceSpec):
 
     def validate(self) -> None:
         super(OAuth2ProxySpec, self).validate()
+        missing_required_fields = self._get_missing_required_fields()
+        if missing_required_fields:
+            raise SpecValidationError(
+                'Missing required fields for oauth2-proxy: '
+                + ', '.join(missing_required_fields)
+                + '.'
+            )
         self._validate_non_empty_string(self.provider_display_name, "provider_display_name")
         self._validate_non_empty_string(self.client_id, "client_id")
         self._validate_non_empty_string(self.client_secret, "client_secret")
@@ -2787,6 +2801,17 @@ class OAuth2ProxySpec(ServiceSpec):
             self._validate_domain_name(self.email_domains, "email_domains")
         if self.https_address is not None:
             self._validate_https_address(self.https_address)
+
+    def _get_missing_required_fields(self) -> List[str]:
+        missing_fields = []
+        for field in self.REQUIRED_FIELDS:
+            value = getattr(self, field, None)
+            if value is None:
+                missing_fields.append(field)
+                continue
+            if isinstance(value, str) and not value.strip():
+                missing_fields.append(field)
+        return missing_fields
 
     def _validate_non_empty_string(self, value: Optional[str], field_name: str) -> None:
         if not value or not isinstance(value, str) or not value.strip():

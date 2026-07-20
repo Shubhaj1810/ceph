@@ -243,12 +243,21 @@ class Inventory:
         # load inventory
         i = self.mgr.get_store('inventory')
         if i:
-            self._inventory: Dict[str, dict] = json.loads(i)
-            # handle old clusters missing 'hostname' key from hostspec
-            for k, v in self._inventory.items():
+            raw_inventory = json.loads(i)
+            # Normalize hostname keys to lowercase (RFC 952/1123:
+            # hostnames are case-insensitive). This ensures upgraded
+            # clusters with uppercase hostnames become consistent with
+            # HostSpec normalization on first load.
+            self._inventory: Dict[str, dict] = {}
+            for k, v in raw_inventory.items():
+                normalized_key = k.lower()
                 if 'hostname' not in v:
-                    v['hostname'] = k
+                    v['hostname'] = normalized_key
+                else:
+                    v['hostname'] = v['hostname'].lower()
+                self._inventory[normalized_key] = v
 
+            for k, v in self._inventory.items():
                 # convert legacy non-IP addr?
                 if is_valid_ip(str(v.get('addr'))):
                     continue
@@ -994,6 +1003,7 @@ class HostCache():
                 self.mgr.set_store(k, None)
             try:
                 host, v = self._combine_potential_split_entry(host, v)
+                host = host.lower()
                 j = json.loads(v)
                 if 'last_device_update' in j:
                     self.last_device_update[host] = str_to_datetime(j['last_device_update'])

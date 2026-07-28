@@ -236,7 +236,8 @@ class UpgradeState:
                  rotated_mgr_mon_auth_key_daemons: Optional[List[str]] = None,
                  has_set_cephx_allowed_ciphers: Optional[bool] = False,
                  health_warnings_muted: Optional[bool] = False,
-                 rotated_osd_mds_keyrings: Optional[bool] = False
+                 rotated_osd_mds_keyrings: Optional[bool] = False,
+                 mds_upgrade_completed: Optional[bool] = False,
                  ):
 
         self._target_name: str = target_name  # Use CephadmUpgrade.target_image instead.
@@ -265,6 +266,7 @@ class UpgradeState:
         self.has_set_cephx_allowed_ciphers = has_set_cephx_allowed_ciphers
         self.rotated_osd_mds_keyrings = rotated_osd_mds_keyrings
         self.health_warnings_muted = health_warnings_muted
+        self.mds_upgrade_completed = mds_upgrade_completed
 
     def to_json(self) -> dict:
         return {
@@ -291,7 +293,8 @@ class UpgradeState:
             'rotated_mgr_mon_auth_key_daemons': self.rotated_mgr_mon_auth_key_daemons,
             'has_set_cephx_allowed_ciphers': self.has_set_cephx_allowed_ciphers,
             'health_warnings_muted': self.health_warnings_muted,
-            'rotated_osd_mds_keyrings': self.rotated_osd_mds_keyrings
+            'rotated_osd_mds_keyrings': self.rotated_osd_mds_keyrings,
+            'mds_upgrade_completed': self.mds_upgrade_completed,
         }
 
     @classmethod
@@ -2362,6 +2365,22 @@ class CephadmUpgrade:
                 else:
                     raise
 
+    def _verify_all_mds_upgraded(self, target_version: str) -> bool:
+        ret, out_ver, err = self.mgr.check_mon_command({
+            'prefix': 'versions',
+        })
+        j = json.loads(out_ver)
+        mds_versions = j.get('mds', {})
+        all_upgraded = True
+        for version, count in mds_versions.items():
+            short_version = version.split(' ')[2]
+            if short_version != target_version:
+                logger.warning(
+                    'Upgrade: %d mds daemon(s) are %s != target %s' %
+                    (count, short_version, target_version))
+                all_upgraded = False
+        return all_upgraded
+
     def _complete_mds_upgrade(self) -> None:
         assert self.upgrade_state is not None
         if self.upgrade_state.fail_fs:
@@ -2648,6 +2667,17 @@ class CephadmUpgrade:
                 return
             self._upgrade_daemons(to_upgrade, target_image, target_digests)
             if to_upgrade:
+                if daemon_type == 'mds' and self.upgrade_state.fail_fs:
+                    if self._verify_all_mds_upgraded(target_version):
+                        logger.info('Upgrade: All MDS daemons upgraded to %s, '
+                                    'setting filesystems joinable' % target_version)
+                        self._complete_mds_upgrade()
+                        self.upgrade_state.mds_upgrade_completed = True
+                        self._save_upgrade_state()
+                    else:
+                        logger.info('Upgrade: Waiting for all MDS daemons to report '
+                                    'target version %s before setting filesystems '
+                                    'joinable' % target_version)
                 return
 
             self._handle_need_upgrade_self(need_upgrade_self, daemon_type == 'mgr')
@@ -2687,7 +2717,7 @@ class CephadmUpgrade:
                 self._complete_osd_upgrade(target_major, target_major_name)
 
             # complete mds upgrade?
-            if daemon_type == 'mds':
+            if daemon_type == 'mds' and not self.upgrade_state.mds_upgrade_completed:
                 self._complete_mds_upgrade()
 
             # Make sure all metadata is up to date before saying we are done upgrading this daemon type

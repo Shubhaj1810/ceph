@@ -179,11 +179,6 @@ class NFSService(CephService):
             deps.append(f'tls_min_version: {nfs_spec.tls_min_version}')
         if nfs_spec.tls_ciphers is not None:
             deps.append(f'tls_ciphers: {nfs_spec.tls_ciphers}')
-        # TSM related
-        if nfs_spec.enable_tsm:
-            deps.append(f'enable_tsm: {nfs_spec.enable_tsm}')
-            if nfs_spec.tsm_port:
-                deps.append(f'tsm_port: {nfs_spec.tsm_port}')
 
         parent_deps = super().get_dependencies(mgr, spec, daemon_type)
         return sorted(deps + parent_deps)

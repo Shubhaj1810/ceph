@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from io import StringIO
 from shlex import quote
 from typing import TYPE_CHECKING, Optional, List, Tuple, Dict, Iterator, TypeVar, Awaitable, Union
+from ceph.deployment.hostspec import normalize_hostname
 from orchestrator import OrchestratorError
 
 try:
@@ -197,19 +198,19 @@ class SSHManager:
         try:
             yield
         except OSError as e:
-            self.mgr.offline_hosts.add(host)
+            self.mgr.offline_hosts.add(normalize_hostname(host))
             log_content = log_string.getvalue()
             msg = f"Can't communicate with remote host `{addr}`, possibly because the host is not reachable or python3 is not installed on the host. {str(e)}"
             logger.exception(msg)
             raise HostConnectionError(msg, host, addr)
         except asyncssh.Error as e:
-            self.mgr.offline_hosts.add(host)
+            self.mgr.offline_hosts.add(normalize_hostname(host))
             log_content = log_string.getvalue()
             msg = f'Failed to connect to {host} ({addr}). {str(e)}' + '\n' + f'Log: {log_content}'
             logger.debug(msg)
             raise HostConnectionError(msg, host, addr)
         except Exception as e:
-            self.mgr.offline_hosts.add(host)
+            self.mgr.offline_hosts.add(normalize_hostname(host))
             log_content = log_string.getvalue()
             logger.exception(str(e))
             raise HostConnectionError(
@@ -267,6 +268,7 @@ class SSHManager:
             address = host
         if log_command:
             logger.debug(f'Running command: {rcmd}')
+
         try:
             r = await conn.run(str(rcmd), input=stdin)
         # handle these Exceptions otherwise you might get a weird error like
@@ -275,19 +277,19 @@ class SSHManager:
             # SSH connection closed or broken, will create new connection next call
             logger.debug(f'Connection to {host} failed. {str(e)}')
             await self._reset_con(host)
-            self.mgr.offline_hosts.add(host)
+            self.mgr.offline_hosts.add(normalize_hostname(host))
             raise HostConnectionError(f'Unable to reach remote host {host}. {str(e)}', host, address)
         except asyncssh.ProcessError as e:
             msg = f"Cannot execute the command '{rcmd}' on the {host}. {str(e.stderr)}."
             logger.debug(msg)
             await self._reset_con(host)
-            self.mgr.offline_hosts.add(host)
+            self.mgr.offline_hosts.add(normalize_hostname(host))
             raise HostConnectionError(msg, host, address)
         except Exception as e:
             msg = f"Generic error while executing command '{rcmd}' on the host {host}. {str(e)}."
             logger.debug(msg)
             await self._reset_con(host)
-            self.mgr.offline_hosts.add(host)
+            self.mgr.offline_hosts.add(normalize_hostname(host))
             raise HostConnectionError(msg, host, address)
 
         def _rstrip(v: Union[bytes, str, None]) -> str:

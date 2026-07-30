@@ -2365,6 +2365,7 @@ Then run the following:
         :param force: bypass running daemons check
         :param offline: remove offline host
         """
+        original_host = host
         host = normalize_hostname(host)
 
         # check if host is offline
@@ -2434,7 +2435,7 @@ Then run the following:
 
             cmd_args = {
                 'prefix': 'osd crush rm',
-                'name': host
+                'name': original_host
             }
             run_cmd(cmd_args)
 
@@ -2442,7 +2443,7 @@ Then run the following:
             try:
                 self.check_mon_command({
                     'prefix': 'osd crush remove',
-                    'name': host,
+                    'name': original_host,
                 })
             except MonCommandFailed as e:
                 self.log.error(f'Couldn\'t remove host {host} from CRUSH map: {str(e)}')

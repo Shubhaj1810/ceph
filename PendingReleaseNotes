@@ -5,6 +5,15 @@
   Implicit logging object commits are now performed asynchronously.
 * RGW: When the `rgw_copious_policy_logging` variable is set to true,
        a detailed trace of policy evaluation is logged.
+* RGW: This release contains a fix for CVE-2026-54330. We now reject
+  Sigv4 requests with `host` and `x-amz-` headers not included in the
+  signed subset. Unfortunately, the REST client used in multisite was
+  generating such improperly signed requests.
+
+  If you are running multisite, you must set the
+  ``rgw_sigv4_insecure`` option to true before you begin to
+  upgrade. After all clusters are upgraded, set the option to
+  ``false`` again.
 
 * DASHBOARD: RGW Service form updated to take input regarding QAT compression.
   - QAT compression is an optional field which can be set to 'Hardware' or 'Software' by selecting options from provided dropdwon. If 'None' is selected, compression is removed altogether.

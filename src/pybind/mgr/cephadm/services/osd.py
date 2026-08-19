@@ -52,27 +52,6 @@ class OSDService(CephService):
                 'value': value,
             })
 
-    def _apply_osd_config_to_daemon(
-        self,
-        osd_id: str,
-        cfg: dict[str, str],
-    ) -> None:
-        if not cfg:
-            return
-
-        for key, value in cfg.items():
-            logger.info(
-                "Applying OSD spec config %s=%s to osd.%s",
-                key, value, osd_id,
-            )
-
-            self.mgr.check_mon_command({
-                'prefix': 'config set',
-                'who': f'osd.{osd_id}',
-                'name': key,
-                'value': value,
-            })
-
     def _get_osd_spec_configs(
         self,
         spec: DriveGroupSpec,

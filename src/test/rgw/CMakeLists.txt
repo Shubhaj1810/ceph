@@ -447,3 +447,8 @@ target_link_libraries(ceph_test_datalog
   ${UNITTEST_LIBS}
   ${rgw_libs})
 install(TARGETS ceph_test_datalog DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# unittest_rgw_auth_sigv4
+add_executable(unittest_rgw_auth_sigv4 test_rgw_auth_sigv4.cc)
+add_ceph_unittest(unittest_rgw_auth_sigv4)
+target_link_libraries(unittest_rgw_auth_sigv4 ${rgw_libs} ${UNITTEST_LIBS})
